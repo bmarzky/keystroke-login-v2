@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Register{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Register</h2>
+    <div id="message"></div>
+
+    <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="username" placeholder="Masukkan username" autofocus>
+    </div>
+
+    <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="password" placeholder="Minimal 6 karakter">
+    </div>
+
+    <button onclick="handleRegister()">Register</button>
+    <p>Sudah punya akun? <a href="/login">Login</a></p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const usernameField = document.getElementById('username')
+    const passwordField = document.getElementById('password')
+
+    usernameField.focus()
+
+    // Enter di username → pindah ke password
+    usernameField.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault()
+            passwordField.focus()
+        }
+    })
+
+    // Enter di password → submit register
+    passwordField.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault()
+            handleRegister()
+        }
+    })
+})
+
+async function handleRegister() {
+    const usernameField = document.getElementById('username')
+    const passwordField = document.getElementById('password')
+    const username      = usernameField.value.trim()
+    const password      = passwordField.value
+
+    if (!username || !password) {
+        showMessage('Username dan password wajib diisi', 'error')
+        return
+    }
+
+    const response = await fetch('/api/register', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ username, password })
+    })
+
+    const data = await response.json()
+
+    usernameField.value = ''
+    passwordField.value = ''
+
+    if (response.ok) {
+        showMessage(data.message, 'success')
+        setTimeout(() => window.location.href = '/login', 1500)
+    } else {
+        showMessage(data.error, 'error')
+        usernameField.focus()
+    }
+}
+
+function showMessage(text, type) {
+    const msg = document.getElementById('message')
+    msg.textContent = text
+    msg.className   = type
+}
+</script>
+{% endblock %}
