@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, render_template
 from backend.services.supabase_client import get_supabase
-from backend.services.keystroke_service import save_session
+from backend.services.keystroke_service import save_session, get_sessions
+from backend.services.scoring_service import verify
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -30,7 +31,6 @@ def register():
 
     supabase = get_supabase()
 
-    # Cek username sudah ada
     existing = supabase.table('users') \
         .select('id') \
         .eq('username', username) \
@@ -39,7 +39,6 @@ def register():
     if existing.data:
         return jsonify({'error': 'Username sudah dipakai'}), 409
 
-    # Simpan user baru
     supabase.table('users').insert({
         'username':    username,
         'password':    password,
@@ -79,14 +78,40 @@ def login():
         return jsonify({'error': 'Username atau password salah'}), 401
 
     # Validasi keystroke
-    dwell  = keystroke.get('dwell', [])
+    dwell  = keystroke.get('dwell',  [])
     flight = keystroke.get('flight', [])
-    meta   = keystroke.get('meta', {})
+    meta   = keystroke.get('meta',   {})
 
     if meta.get('paste_detected'):
         return jsonify({'error': 'Input tidak valid'}), 400
 
-    # Simpan sesi keystroke jika data cukup
+    if len(dwell) < 2:
+        return jsonify({
+            'message':     'Login berhasil',
+            'status':      user['status'],
+            'login_count': user['login_count']
+        }), 200
+
+    # Ambil sesi sebelumnya untuk bangun profil
+    previous_sessions = get_sessions(user['id'])
+
+    # Verifikasi keystroke
+    score = verify(
+        new_dwell   = dwell,
+        new_flight  = flight,
+        sessions    = previous_sessions,
+        login_count = user['login_count']
+    )
+
+    # Jika profil sudah ada dan pola tidak cocok → tolak
+    if score['verified'] is False:
+        return jsonify({
+            'error':     'Pola ketikan tidak cocok',
+            'distance':  score['distance'],
+            'threshold': score['threshold']
+        }), 401
+
+    # Simpan sesi keystroke
     if len(dwell) >= 2:
         save_session(
             user_id = user['id'],
@@ -95,14 +120,25 @@ def login():
             meta    = meta
         )
 
-    # Update login_count
-    new_count = user['login_count'] + 1
+    # Update login_count dan status
+    new_count  = user['login_count'] + 1
+    new_status = 'active' if new_count >= 5 else 'enrolling'
+
     supabase.table('users').update({
-        'login_count': new_count
+        'login_count': new_count,
+        'status':      new_status
     }).eq('id', user['id']).execute()
 
+    # Pesan berbeda tergantung status
+    if score['verified'] is None:
+        message = f'Login berhasil — mengumpulkan data sesi ke-{new_count}'
+    else:
+        message = f'Login berhasil — pola ketikan terverifikasi'
+
     return jsonify({
-        'message':     'Login berhasil',
-        'status':      user['status'],
-        'login_count': new_count
+        'message':     message,
+        'status':      new_status,
+        'login_count': new_count,
+        'distance':    score['distance'],
+        'threshold':   score['threshold']
     }), 200
