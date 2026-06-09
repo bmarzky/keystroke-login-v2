@@ -33,17 +33,15 @@ const collector = (() => {
             if (IGNORED_KEYS.includes(e.key)) return
             if (e.repeat) return
 
-            // Hitung flight dari keyup sebelumnya
-            if (lastKeyup !== null) {
+            // Hitung flight — kecuali Backspace
+            if (lastKeyup !== null && e.key !== 'Backspace') {
                 flight.push(
                     parseFloat((e.timeStamp - lastKeyup).toFixed(2))
                 )
             }
 
-            // Catat waktu keydown
             keydownLog[e.key] = e.timeStamp
 
-            // Hitung backspace
             if (e.key === 'Backspace') {
                 backspaceCount++
             }
