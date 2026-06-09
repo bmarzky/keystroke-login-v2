@@ -45,7 +45,12 @@ document.addEventListener('DOMContentLoaded', () => {
     })
 })
 
+let isSubmitting = false
+
 async function handleLogin() {
+    if (isSubmitting) return
+    isSubmitting = true
+
     const usernameField = document.getElementById('username')
     const passwordField = document.getElementById('password')
     const username      = usernameField.value.trim()
@@ -54,6 +59,7 @@ async function handleLogin() {
 
     if (!username || !password) {
         showMessage('Username dan password wajib diisi', 'error')
+        isSubmitting = false
         return
     }
 
@@ -68,9 +74,10 @@ async function handleLogin() {
     usernameField.value = ''
     passwordField.value = ''
     collector.reset()
+    isSubmitting = false
 
     if (response.ok) {
-        showMessage(`Login berhasil — sesi ke-${data.login_count}`, 'success')
+        showMessage(`${data.message}`, 'success')
     } else {
         showMessage(data.error, 'error')
     }
